@@ -163,7 +163,13 @@ namespace {
             FunctionType *printfFT = FunctionType::get(Type::getVoidTy(M.getContext()), printfListAR, false);
             typeList.pop_back();
             typeList.pop_back();
-            Value* printfFunc = Function::Create(getPtrFT, Function::ExternalLinkage, "DPprintf" , &M);
+            Value* printfFunc = Function::Create(printfFT, Function::ExternalLinkage, "DPprintf" , &M);
+            
+            typeList.push_back(Type::getInt64Ty(M.getContext()));
+            ArrayRef<Type *> Z5MPnewmListAR(typeList);
+            FunctionType *Z5MPnewmFT = FunctionType::get(PointerType::getUnqual(Type::getInt8Ty(M.getContext())), Z5MPnewmListAR, false);
+            typeList.pop_back();
+            Value* Z5MPnewmFunc = Function::Create(Z5MPnewmFT, Function::ExternalLinkage, "_Z5MPnewm" , &M);
             
             return true;
         }

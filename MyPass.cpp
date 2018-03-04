@@ -188,7 +188,8 @@ namespace {
                                                 LIUseNum++;
                                                 continue;
                                             }
-                                        } else if (InvokeInst *II = dyn_cast<InvokeInst>(inst2)) {
+                                        }
+                                        else if (InvokeInst *II = dyn_cast<InvokeInst>(inst2)) {
                                             if (Function *fTemp = II->getCalledFunction()) {
                                                 if (!(fTemp->getFunctionType()->isVarArg())) {
                                                     auto index = std::find(localFunName.begin(), localFunName.end(), fTemp->getName().str());
@@ -207,18 +208,18 @@ namespace {
                                                                     errs() << "find invoke LocalFun use!" << '\n';
                                                                     //                                                                errs() << fTemp->getName();
 #endif
-                                                                    
+
                                                                     LIUseNum++;
                                                                     FunArgUseNum++;
                                                                     continue;
                                                                 }
                                                             }
-                                                            
+
                                                         }
                                                     }
                                                 }
-                                                
-                                                
+
+
                                             }
                                             else{
                                                 if (!(II->getFunctionType()->isVarArg())) {
@@ -235,7 +236,7 @@ namespace {
                                                         }
                                                     }
                                                 }
-                                                
+
                                             }
                                         }
 
@@ -385,7 +386,8 @@ namespace {
                                                     LIUseNum--;
                                                     RI->setOperand(0, sameLI);
                                                 }
-                                            } else if (InvokeInst *II = dyn_cast<InvokeInst>(inst2)) {
+                                            }
+                                            else if (InvokeInst *II = dyn_cast<InvokeInst>(inst2)) {
                                                 if (Function *fTemp = II->getCalledFunction()) {
                                                     if (!(fTemp->getFunctionType()->isVarArg())) {
                                                         auto index = std::find(localFunName.begin(), localFunName.end(), fTemp->getName().str());
@@ -426,14 +428,14 @@ namespace {
                                                                             II->dump();
 #endif
                                                                         }
-                                                                        
+
                                                                     }
                                                                 }
                                                             }
-                                                            
+
                                                         }
                                                     }
-                                                    
+
                                                 }
                                                 else{
                                                     if (!(II->getFunctionType()->isVarArg())) {
@@ -492,7 +494,9 @@ namespace {
                             } else if (CI && (CI->getCalledFunction()->getName().contains("llvm.memset.") || CI->getCalledFunction()->getName().contains("llvm.memcpy."))) {
                                 Value *phi = insertLoadCheckInBasicBlock(tmpF, bb, inst, CI->getArgOperand(0));
                                 CI->setArgOperand(0, phi);
-                            } else {
+                            } else if (CI && CI->getCalledFunction()->getName().equals("_Znwm")) {
+                                CI->setCalledFunction(tmpF->getParent()->getFunction("_Z5MPnewm"));
+                            }else {
                                 auto index = std::find(localFunName.begin(), localFunName.end(), fTemp->getName().str());
                                 if (index == localFunName.end()) {
                                     for (unsigned int i = 0; i < CI->getNumArgOperands(); ++i) {
