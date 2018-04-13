@@ -24,6 +24,7 @@
 #define AND_PTR_VALUE 0x00007FFFFFFFFFFF
 
 //#define DEBUG
+//#define TEST
 
 using namespace llvm;
 
