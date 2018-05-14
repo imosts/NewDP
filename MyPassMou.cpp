@@ -45,6 +45,23 @@ namespace {
                     auto index=std::find(lists.begin(),lists.end(),mo->getName().str());
                     auto indexAdd=std::find(listsAdd.begin(),listsAdd.end(),mo->getName().str());
                     if(index == lists.end() && indexAdd == listsAdd.end()){
+                        FunctionType *FT = mo->getFunctionType();
+                        bool hasStructType = false;
+                        bool isAllStdType = true;
+                        for (int i = 0; i < FT->getNumParams(); ++ i) {
+                            if (PointerType *PT = dyn_cast<PointerType>(FT->getParamType(i))) {
+                                if (StructType *ST = dyn_cast<StructType>(getSouType(PT, pointerLevel(PT)))) {
+                                    hasStructType = true;
+                                    //errs() << ST->getName() << '\n';
+                                    if (!ST->getName().contains(".std::")) {
+                                        isAllStdType = false;
+                                    }
+                                }
+                            }
+                        }
+                        if (hasStructType && isAllStdType) {
+                            continue;
+                        }
                         listsAdd.push_back(mo->getName().str());
 //                        errs() << "Function Name Put it:" << mo->getName().str() << '\n';
                     }
@@ -62,6 +79,18 @@ namespace {
             if (index == lists.end()) {
                 //添加free函数
                 listsAdd.push_back("_Znwm");
+            }
+            
+            index = std::find(lists.begin(), lists.end(), "_Z5MPnewm");
+            if (index == lists.end()) {
+                //添加free函数
+                listsAdd.push_back("_Z5MPnewm");
+            }
+            
+            index = std::find(lists.begin(), lists.end(), "_Z10MPnewArraym");
+            if (index == lists.end()) {
+                //添加free函数
+                listsAdd.push_back("_Z10MPnewArraym");
             }
             
             index = std::find(lists.begin(), lists.end(), "_ZnwmRKSt9nothrow_t");
@@ -170,6 +199,12 @@ namespace {
             FunctionType *Z5MPnewmFT = FunctionType::get(PointerType::getUnqual(Type::getInt8Ty(M.getContext())), Z5MPnewmListAR, false);
             typeList.pop_back();
             Value* Z5MPnewmFunc = Function::Create(Z5MPnewmFT, Function::ExternalLinkage, "_Z5MPnewm" , &M);
+            
+            typeList.push_back(Type::getInt64Ty(M.getContext()));
+            ArrayRef<Type *> Z10MPnewArraymListAR(typeList);
+            FunctionType *Z10MPnewArrayFT = FunctionType::get(PointerType::getUnqual(Type::getInt8Ty(M.getContext())), Z10MPnewArraymListAR, false);
+            typeList.pop_back();
+            Value* Z10MPnewArraymFunc = Function::Create(Z10MPnewArrayFT, Function::ExternalLinkage, "_Z10MPnewArraym" , &M);
             
             return true;
         }

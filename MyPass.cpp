@@ -24,6 +24,7 @@
 #define AND_PTR_VALUE 0x00007FFFFFFFFFFF
 
 //#define DEBUG
+#define NOTMACBASE
 
 using namespace llvm;
 
@@ -68,6 +69,25 @@ namespace {
             #ifdef DEBUG
             errs() << "  Function:" << tmpF->getName() <<'\n' <<'\n';
             #endif
+            
+            FunctionType *FT = F.getFunctionType();
+            bool hasStructType = false;
+            bool isAllStdType = true;
+            for (int i = 0; i < FT->getNumParams(); ++i) {
+                if (PointerType *PT = dyn_cast<PointerType>(FT->getParamType(i))) {
+                    if (StructType *ST = dyn_cast<StructType>(getSouType(PT, pointerLevel(PT)))) {
+                        hasStructType = true;
+                        //errs() << ST->getName() << '\n';
+                        if (!ST->getName().contains(".std::")) {
+                            isAllStdType = false;
+                        }
+                    }
+                }
+            }
+//            if (hasStructType && isAllStdType) {
+//                return false;
+//            }
+            
             for (Function::iterator bb = tmpF->begin(); bb != tmpF->end(); ++bb) {
                 for (BasicBlock::iterator inst = bb->begin(); inst != bb->end(); ++inst) {
                     #ifdef DEBUG
@@ -221,6 +241,7 @@ namespace {
 
 
                                             }
+#ifdef NOTMACBASE
                                             else{
                                                 if (!(II->getFunctionType()->isVarArg())) {
                                                     for (Instruction::op_iterator oi = II->op_begin(); oi != II->op_end(); ++oi) {
@@ -238,6 +259,7 @@ namespace {
                                                 }
 
                                             }
+#endif
                                         }
 
                                     }
@@ -437,6 +459,7 @@ namespace {
                                                     }
 
                                                 }
+#ifdef NOTMACBASE
                                                 else{
                                                     if (!(II->getFunctionType()->isVarArg())) {
                                                         for (unsigned i = 0; i < II->getNumOperands(); ++i) {
@@ -468,6 +491,7 @@ namespace {
                                                         }
                                                     }
                                                 }
+#endif
                                             }
                                         }
                                     }
@@ -495,7 +519,15 @@ namespace {
                                 Value *phi = insertLoadCheckInBasicBlock(tmpF, bb, inst, CI->getArgOperand(0));
                                 CI->setArgOperand(0, phi);
                             } else if (CI && CI->getCalledFunction()->getName().equals("_Znwm")) {
-                                CI->setCalledFunction(tmpF->getParent()->getFunction("_Z5MPnewm"));
+                                if (!(hasStructType && isAllStdType)) {
+                                    CI->setCalledFunction(tmpF->getParent()->getFunction("_Z5MPnewm"));
+                                }
+                                
+                            }else if (CI && CI->getCalledFunction()->getName().equals("_Znam")) {
+                                if (!(hasStructType && isAllStdType)) {
+                                    CI->setCalledFunction(tmpF->getParent()->getFunction("_Z10MPnewArraym"));
+                                }
+
                             }else {
                                 auto index = std::find(localFunName.begin(), localFunName.end(), fTemp->getName().str());
                                 if (index == localFunName.end()) {
@@ -603,6 +635,16 @@ namespace {
                                 II->replaceAllUsesWith(LI);
                                 SI->setOperand(0, II);
                                 continue;
+                            } else if (II && II->getCalledFunction()->getName().equals("_Znwm")) {
+                                if (!(hasStructType && isAllStdType)) {
+                                    II->setCalledFunction(tmpF->getParent()->getFunction("_Z5MPnewm"));
+                                }
+                                
+                            }else if (II && II->getCalledFunction()->getName().equals("_Znam")) {
+                                if (!(hasStructType && isAllStdType)) {
+                                    II->setCalledFunction(tmpF->getParent()->getFunction("_Z10MPnewArraym"));
+                                }
+                                
                             } else {
                                 auto index = std::find(localFunName.begin(), localFunName.end(), fTemp->getName().str());
                                 if (index == localFunName.end()) {
@@ -763,6 +805,17 @@ namespace {
                             changTOSafeMalloc(tmpF, CI, SI, tmp);
                             inst = tmp;
                             inst--;
+                        } else if (isComeFormLoaclCall(SI->getPointerOperand())) {
+#ifdef DEBUG
+                            errs() << "find SI pointer operand come form local call use!:\n";
+                            SI->dump();
+                            SI->getPointerOperand()->dump();
+#endif
+                            Value *phi = insertLoadCheckInBasicBlock(tmpF, bb, inst, SI->getPointerOperand());
+                            SI->setOperand(1, phi);
+#ifdef DEBUG
+                            bb->dump();
+#endif
                         }
                     }
                     
