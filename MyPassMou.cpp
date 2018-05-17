@@ -75,6 +75,12 @@ namespace {
                 listsAdd.push_back("free");
             }
             
+            index = std::find(lists.begin(), lists.end(), "realloc");
+            if (index == lists.end()) {
+                //添加free函数
+                listsAdd.push_back("realloc");
+            }
+            
             index = std::find(lists.begin(), lists.end(), "_Znwm");
             if (index == lists.end()) {
                 //添加free函数
@@ -167,6 +173,14 @@ namespace {
             FunctionType *freeFT = FunctionType::get(Type::getVoidTy(M.getContext()), freeListAR, false);
             typeList.pop_back();
             Value* freeFunc = Function::Create(freeFT, Function::ExternalLinkage, "safeFree" , &M);
+            
+            typeList.push_back(PointerType::getUnqual(Type::getInt8Ty(M.getContext())));
+            typeList.push_back(Type::getInt64Ty(M.getContext()));
+            ArrayRef<Type *> reallocListAR(typeList);
+            FunctionType *reallocFT = FunctionType::get(PointerType::getUnqual(Type::getInt8Ty(M.getContext())), reallocListAR, false);
+            typeList.pop_back();
+            typeList.pop_back();
+            Value* reallocFunc = Function::Create(reallocFT, Function::ExternalLinkage, "safeRealloc" , &M);
             
             typeList.push_back(PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(M.getContext()))));
             typeList.push_back(PointerType::getUnqual(PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(M.getContext())))));

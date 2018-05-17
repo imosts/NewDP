@@ -523,12 +523,17 @@ namespace {
                                     CI->setCalledFunction(tmpF->getParent()->getFunction("_Z5MPnewm"));
                                 }
                                 
-                            }else if (CI && CI->getCalledFunction()->getName().equals("_Znam")) {
+                            } else if (CI && CI->getCalledFunction()->getName().equals("_Znam")) {
                                 if (!(hasStructType && isAllStdType)) {
                                     CI->setCalledFunction(tmpF->getParent()->getFunction("_Z10MPnewArraym"));
                                 }
 
-                            }else {
+                            } else if (CI && CI->getCalledFunction()->getName().equals("realloc")) {
+                                if (!(hasStructType && isAllStdType)) {
+                                    CI->setCalledFunction(tmpF->getParent()->getFunction("safeRealloc"));
+                                }
+                                
+                            } else {
                                 auto index = std::find(localFunName.begin(), localFunName.end(), fTemp->getName().str());
                                 if (index == localFunName.end()) {
                                     for (unsigned int i = 0; i < CI->getNumArgOperands(); ++i) {
@@ -867,6 +872,55 @@ namespace {
             PhiNode->addIncoming(ITPmulti, nBAND);
             return PhiNode;
         }
+        
+//        Value * insertPtrCheckInBasicBlock(Function* F, Function::iterator &originBB, BasicBlock::iterator &insetPoint, Value *address){
+//            PtrToIntInst *PTI = new PtrToIntInst(address, Type::getInt64Ty(originBB->getContext()), "", &(*insetPoint));
+//            BinaryOperator *BO = BinaryOperator::Create(Instruction::BinaryOps::And, PTI, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), MULTIPTR_OR_NODEPTR, false), "", &(*insetPoint));
+//            ICmpInst *ICM = new ICmpInst(&(*insetPoint), llvm::CmpInst::ICMP_NE, BO, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), 0, false));
+//            
+//            BasicBlock *newBB = llvm::SplitBlock(&(*originBB), &(*insetPoint), nullptr, nullptr);
+//            BasicBlock *oldBB = &(*originBB);
+//            BasicBlock::iterator inst = originBB->begin();
+//            newBB->setName("newBasicBlock");
+//            originBB->setName("oldBasicBlock");
+//            
+//            BasicBlock *nBAND = BasicBlock::Create(originBB->getContext(), "ANDBB", F, newBB);
+//            BranchInst *nBIAND = BranchInst::Create(newBB, nBAND);
+//            
+//            BasicBlock *nBmulti = BasicBlock::Create(originBB->getContext(), "multiBB", F, newBB);
+//            BranchInst *nBINode = BranchInst::Create(newBB, nBmulti);
+//            
+//            BranchInst *oldBR = BranchInst::Create(nBAND, newBB, ICM, &(*originBB));
+//            inst = originBB->end();
+//            inst--;
+//            inst--;
+//            inst->eraseFromParent();
+//            
+//            originBB++;
+//            inst = originBB->begin();
+//            BinaryOperator *BOAnd = BinaryOperator::Create(Instruction::BinaryOps::And, PTI, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), AND_PTR_VALUE, false), "", &(*inst));
+//            IntToPtrInst *ITPAnd = new IntToPtrInst(BOAnd, address->getType(), "", &(*inst));
+//            BinaryOperator *BOmul = BinaryOperator::Create(Instruction::BinaryOps::And, PTI, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), MULTIPTR, false), "", &(*inst));
+//            ICmpInst *ICMelse = new ICmpInst(&(*inst), llvm::CmpInst::ICMP_NE, BOmul, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), 0, false));
+//            BranchInst *oldBRelse = BranchInst::Create(nBmulti, newBB, ICMelse, &(*originBB));
+//            inst->eraseFromParent();
+//            
+//            originBB++;
+//            inst = originBB->begin();
+//            BitCastInst *multiBCI = new BitCastInst(ITPAnd, PointerType::getUnqual(ITPAnd->getType()), "", &(*inst));
+//            LoadInst *multiLI = new LoadInst(multiBCI, "", &(*inst));
+//            PtrToIntInst *PTImulti = new PtrToIntInst(multiLI, Type::getInt64Ty(originBB->getContext()), "", &(*inst));
+//            BinaryOperator *BOmulte = BinaryOperator::Create(Instruction::BinaryOps::And, PTImulti, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), AND_PTR_VALUE, false), "", &(*inst));
+//            IntToPtrInst *ITPmulti = new IntToPtrInst(BOmulte, multiLI->getType(), "", &(*inst));
+//            
+//            originBB++;
+//            inst = originBB->begin();
+//            PHINode *PhiNode = PHINode::Create(address->getType(), 3, "", &(*inst));
+//            PhiNode->addIncoming(address, oldBB);
+//            PhiNode->addIncoming(ITPAnd, nBAND);
+//            PhiNode->addIncoming(ITPmulti, nBmulti);
+//            return PhiNode;
+//        }
         
         //判断ICMP的操作数是否来源于Value V
         bool instComeFromVal(Instruction *I, Value *V){
