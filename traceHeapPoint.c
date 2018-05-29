@@ -73,48 +73,28 @@
 #define getNodeRefer(a) ((unsigned int)((((unsigned long)(a))&0x07FF000000000000)>>48))
 #define getFree(a) (((unsigned long)(a))|0x1000000000000000)
 
-int insertNode(void *node){
-    if (node == NULL || notNodePTR(((heapNode *)node)->addr)) {
-        return -1;
-    }
-    heapNode *newNode = malloc(sizeof(heapNode));
-    memset(newNode, 0, sizeof(heapNode));
-    newNode->addr = getNewNodePTR(newNode->addr);//应该在函数外部设置，不然要在外部重新设置一次
-    heapNode *nodeP = node;
-    newNode->next = nodeP->next;
-    newNode->head = nodeP->head;
-    nodeP->next = newNode;
-    return 0;
-}
+//int insertNode(void *node){
+////    if (node == NULL || notNodePTR(((heapNode *)node)->addr)) {
+////        return 1;
+////    }
+//    heapNode *newNode = malloc(sizeof(heapNode));
+////    memset(newNode, 0, sizeof(heapNode));
+////    newNode->addr = getNewNodePTR(newNode->addr);//应该在函数外部设置，不然要在外部重新设置一次
+//    heapNode *nodeP = node;
+//    newNode->next = nodeP->next;
+//    newNode->head = nodeP->head;
+//    nodeP->next = newNode;
+//    return 0;
+//}
 
-int deleteNode(void *node){
-    if (node == NULL || notNodePTR(((heapNode *)node)->addr)) {
-        return -1;
-    }
-    if (((heapNode *)node)->head == node) {
-        return -1;
-    }
-    heapNode *nodeP = ((heapNode *)node)->head;
-    while (nodeP->next != node) {
-        nodeP = nodeP->next;
-    }
-    if (nodeP->next == NULL) {
-        return -1;
-    }
-    nodeP->next = nodeP->next->next;
-    free(node);
-    return 0;
-}
 
 void* safeMalloc(size_t size){
     heapNode *ptr = (heapNode *)malloc(sizeof(heapNode));
     if (ptr) {
         ptr->addr = malloc(size);
-        ptr->addr = (void *)getNodeHeadPTR(ptr->addr);
         ptr->head = ptr;
         ptr->next = NULL;
-        ptr = (heapNode *)getMultiPTR(ptr);
-        return ptr;
+        return getMultiPTR(ptr);
     }else{
         return NULL;
     }
@@ -128,7 +108,7 @@ void safeFree(void* ptr){
     heapNode *nodeHeadP = (heapNode *)truePtrValue(ptr);
     free((void *)truePtrValue(nodeHeadP->addr));
     nodeHeadP->addr = NULL;
-    if (nodeHeadP->next) {
+    while (nodeHeadP->next) {
         nodeHeadP = nodeHeadP->next;
         nodeHeadP->addr = NULL;
     }
@@ -136,30 +116,34 @@ void safeFree(void* ptr){
 
 void getPtr(void **nodeOrigin, void ** nodeOld, void *ptrNew){
     if (*nodeOrigin != NULL && !notMultiPTR(*nodeOrigin)) {
-        if (truePtrValue(*nodeOrigin)-(unsigned long)ptrNew > 0x100000000) {
+        heapNode *nodeP = truePtrValue(*nodeOrigin);
+        if (abs((unsigned long)nodeP-(unsigned long)ptrNew) > 0x100000000) {
             *nodeOld = ptrNew;
-            return;
-        } else if (!insertNode(truePtrValue(*nodeOrigin))) {
-            heapNode *newNode = ((heapNode *)truePtrValue(*nodeOrigin))->next;
-            newNode->addr = getNewNodePTR(ptrNew);
-            *nodeOld = getMultiPTR(newNode);
-            return;
         } else {
-            printf("getPtr Error1!\n");
-            *nodeOld = ptrNew;
-            return;
+            heapNode *newNode = malloc(sizeof(heapNode));
+            newNode->next = nodeP->next;
+            newNode->head = nodeP->head;
+            nodeP->next = newNode;
+            newNode->addr = ptrNew;
+            *nodeOld = getMultiPTR(newNode);
         }
+//        else {
+//            printf("getPtr Error1!\n");
+//            *nodeOld = ptrNew;
+//            return;
+//        }
+    } else {
+        *nodeOld = ptrNew;
     }
-    *nodeOld = ptrNew;
 }
 
-void DPprintf(char *inf, void **p){
-    printf(inf, p);
-    printf(inf, *p);
-}
-
-void _Z8DPprintfPcPPv(char *inf, void **p){
-    printf(inf, p);
-    printf(inf, *p);
-}
+//void DPprintf(char *inf, void **p){
+//    printf(inf, p);
+//    printf(inf, *p);
+//}
+//
+//void _Z8DPprintfPcPPv(char *inf, void **p){
+//    printf(inf, p);
+//    printf(inf, *p);
+//}
 

@@ -1,5 +1,4 @@
 #include <iostream>
-#include "DPnew.h"
 
 #define getNodeHeadPTR(a) (((unsigned long)(a))|0x6000000000000000)
 #define getMultiPTR(a) (((unsigned long)(a))|0x8000000000000000)
@@ -21,11 +20,9 @@ void* newSafeMalloc(size_t size){
     heapNode *ptr = (heapNode *)malloc(sizeof(heapNode));
     if (ptr) {
         ptr->addr = malloc(size);
-        ptr->addr = (void *)getNodeHeadPTR(ptr->addr);
         ptr->head = ptr;
         ptr->next = NULL;
-        ptr = (heapNode *)getMultiPTR(ptr);
-        return ptr;
+        return (heapNode *)getMultiPTR(ptr);
     }else{
         return NULL;
     }
@@ -33,18 +30,15 @@ void* newSafeMalloc(size_t size){
 
 
 void newSafeFree(void* ptr){
-    if (ptr == NULL || notMultiPTR(ptr)) {
-//        std::cout << "free1: " << ptr << std::endl;
+    if (ptr == NULL || notMultiPTR(((heapNode *)(ptr)))) {
         free(ptr);
         return;
     }
     heapNode *nodeHeadP = (heapNode *)truePtrValue(ptr);
     free((void *)truePtrValue(nodeHeadP->addr));
-//    std::cout << "free2: " << nodeHeadP->addr << std::endl;
     nodeHeadP->addr = NULL;
-    if (nodeHeadP->next) {
+    while (nodeHeadP->next) {
         nodeHeadP = nodeHeadP->next;
-//        std::cout << "free3: " << nodeHeadP->addr << std::endl;
         nodeHeadP->addr = NULL;
     }
 }
@@ -101,53 +95,53 @@ MPnew(std::size_t size) _THROW_BAD_ALLOC
     return p;
 }
 
-_LIBCPP_WEAK
-void*
-operator new(size_t size, const std::nothrow_t&) _NOEXCEPT
-{
-    void* p = 0;
-#ifndef _LIBCPP_NO_EXCEPTIONS
-    try
-    {
-#endif  // _LIBCPP_NO_EXCEPTIONS
-        p = MPnew(size);
-#ifndef _LIBCPP_NO_EXCEPTIONS
-    }
-    catch (...)
-    {
-    }
-#endif  // _LIBCPP_NO_EXCEPTIONS
-//    std::cout << "内存分配new(size, std::nothrow_t):" << p << "   size:" <<  size << std::endl;
-    return p;
-}
+//_LIBCPP_WEAK
+//void*
+//operator new(size_t size, const std::nothrow_t&) _NOEXCEPT
+//{
+//    void* p = 0;
+//#ifndef _LIBCPP_NO_EXCEPTIONS
+//    try
+//    {
+//#endif  // _LIBCPP_NO_EXCEPTIONS
+//        p = MPnew(size);
+//#ifndef _LIBCPP_NO_EXCEPTIONS
+//    }
+//    catch (...)
+//    {
+//    }
+//#endif  // _LIBCPP_NO_EXCEPTIONS
+////    std::cout << "内存分配new(size, std::nothrow_t):" << p << "   size:" <<  size << std::endl;
+//    return p;
+//}
 
 _LIBCPP_WEAK
 void*
-operator new[](size_t size) _THROW_BAD_ALLOC
+MPnewArray(size_t size) _THROW_BAD_ALLOC
 {
 //    std::cout << "内存分配new[]:" << "   size:" <<  size << std::endl;
     return MPnew(size);
 }
 
-_LIBCPP_WEAK
-void*
-operator new[](size_t size, const std::nothrow_t&) _NOEXCEPT
-{
-    void* p = 0;
-#ifndef _LIBCPP_NO_EXCEPTIONS
-    try
-    {
-#endif  // _LIBCPP_NO_EXCEPTIONS
-        p = operator new[](size);
-#ifndef _LIBCPP_NO_EXCEPTIONS
-    }
-    catch (...)
-    {
-    }
-#endif  // _LIBCPP_NO_EXCEPTIONS
-//    std::cout << "内存分配new[](size, std::nothrow_t):" << p << "   size:" <<  size << std::endl;
-    return p;
-}
+//_LIBCPP_WEAK
+//void*
+//operator new[](size_t size, const std::nothrow_t&) _NOEXCEPT
+//{
+//    void* p = 0;
+//#ifndef _LIBCPP_NO_EXCEPTIONS
+//    try
+//    {
+//#endif  // _LIBCPP_NO_EXCEPTIONS
+//        p = operator new[](size);
+//#ifndef _LIBCPP_NO_EXCEPTIONS
+//    }
+//    catch (...)
+//    {
+//    }
+//#endif  // _LIBCPP_NO_EXCEPTIONS
+////    std::cout << "内存分配new[](size, std::nothrow_t):" << p << "   size:" <<  size << std::endl;
+//    return p;
+//}
 
 
 //delete
@@ -199,8 +193,4 @@ operator delete[] (void* ptr, size_t) _NOEXCEPT
 {
     operator delete[](ptr);
 //    std::cout << "内存释放[]]" << ptr << std::endl;
-}
-
-void DPDebug::DPprintf(void *p){
-    std::cout<< p << std::endl;
 }
