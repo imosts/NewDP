@@ -56,7 +56,7 @@ namespace {
             Function *tmpF = &F;
             unsigned FAnum = 0;
             isFunHasNullPtr = false;
-            
+            bool needBegin = false;
             std::ifstream open_file("localFunName.txt"); // 读取
             while (open_file) {
                 std::string line;
@@ -94,6 +94,10 @@ namespace {
                     errs() << "  Inst Before" <<'\n';
                     inst->dump();
                     #endif
+                    if (needBegin) {
+                        inst = bb->begin();
+                        needBegin = false;
+                    }
                     
                     if (LoadInst *LI = dyn_cast<LoadInst>(inst)) {
                         #ifdef DEBUG
@@ -528,12 +532,14 @@ namespace {
                                     CI->setCalledFunction(tmpF->getParent()->getFunction("_Z10MPnewArraym"));
                                 }
 
-                            } else if (CI && CI->getCalledFunction()->getName().equals("realloc")) {
-                                if (!(hasStructType && isAllStdType)) {
-                                    CI->setCalledFunction(tmpF->getParent()->getFunction("safeRealloc"));
-                                }
-                                
-                            } else {
+                            }
+//                            else if (CI && CI->getCalledFunction()->getName().equals("realloc")) {
+//                                if (!(hasStructType && isAllStdType)) {
+//                                    CI->setCalledFunction(tmpF->getParent()->getFunction("safeRealloc"));
+//                                }
+//
+//                            }
+                            else {
                                 auto index = std::find(localFunName.begin(), localFunName.end(), fTemp->getName().str());
                                 if (index == localFunName.end()) {
                                     for (unsigned int i = 0; i < CI->getNumArgOperands(); ++i) {
@@ -753,24 +759,28 @@ namespace {
                                             #ifdef DEBUG
                                             errs() << "SI Debug 4!\n";
                                             #endif
-                                            std::vector<Value *> getPtrArg;
-                                            
-                                            BitCastInst *originBCI = new BitCastInst(LI->getPointerOperand(), PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(tmpF->getContext()))), "oriBCI", &(*inst));
-                                            getPtrArg.push_back(originBCI);
-                                            BitCastInst *oldBCI = new BitCastInst(SI->getPointerOperand(), PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(tmpF->getContext()))), "oldBCI", &(*inst));
-                                            getPtrArg.push_back(oldBCI);
-                                            BitCastInst *ptrBCI = new BitCastInst(SI->getValueOperand(), PointerType::getUnqual(Type::getInt8Ty(tmpF->getContext())), "ptrBCI", &(*inst));
-                                            getPtrArg.push_back(ptrBCI);
-                                            
-                                            ArrayRef<Value *> funcArg(getPtrArg);
-                                            Value *func = tmpF->getParent()->getFunction("getPtr");
-                                            CallInst *nCI = CallInst::Create(func, funcArg, "", &(*inst));
-                                            inst++;
-                                            SI->eraseFromParent();
-                                            inst--;
+//                                            V->dump();
+//                                            std::vector<Value *> getPtrArg;
+//
+//                                            BitCastInst *originBCI = new BitCastInst(LI->getPointerOperand(), PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(tmpF->getContext()))), "oriBCI", &(*inst));
+//                                            getPtrArg.push_back(originBCI);
+//                                            BitCastInst *oldBCI = new BitCastInst(SI->getPointerOperand(), PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(tmpF->getContext()))), "oldBCI", &(*inst));
+//                                            getPtrArg.push_back(oldBCI);
+//                                            BitCastInst *ptrBCI = new BitCastInst(SI->getValueOperand(), PointerType::getUnqual(Type::getInt8Ty(tmpF->getContext())), "ptrBCI", &(*inst));
+//                                            getPtrArg.push_back(ptrBCI);
+//
+//                                            ArrayRef<Value *> funcArg(getPtrArg);
+//                                            Value *func = tmpF->getParent()->getFunction("getPtr");
+//                                            CallInst *nCI = CallInst::Create(func, funcArg, "", &(*inst));
+//                                            inst++;
+//                                            SI->eraseFromParent();
+//                                            inst--;
+                                            insertPtrCheckInBasicBlock(tmpF, bb, inst, SI, LI);
+                                            needBegin = true;
                                         }
                                     }
-                                }else if (GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
+                                }
+                                else if (GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
                                     #ifdef DEBUG
                                     errs() << "GlobalValue1!\n";
                                     #endif
@@ -779,20 +789,21 @@ namespace {
                                         errs() << "GlobalValue!\n";
                                         #endif
                                         std::vector<Value *> getPtrArg;
-                                        
+
                                         BitCastInst *originBCI = new BitCastInst(V, PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(tmpF->getContext()))), "oriBCI", &(*inst));
                                         getPtrArg.push_back(originBCI);
                                         BitCastInst *oldBCI = new BitCastInst(SI->getPointerOperand(), PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(tmpF->getContext()))), "oldBCI", &(*inst));
                                         getPtrArg.push_back(oldBCI);
                                         BitCastInst *ptrBCI = new BitCastInst(SI->getValueOperand(), PointerType::getUnqual(Type::getInt8Ty(tmpF->getContext())), "ptrBCI", &(*inst));
                                         getPtrArg.push_back(ptrBCI);
-                                        
+
                                         ArrayRef<Value *> funcArg(getPtrArg);
                                         Value *func = tmpF->getParent()->getFunction("getPtr");
                                         CallInst *nCI = CallInst::Create(func, funcArg, "", &(*inst));
                                         inst++;
                                         SI->eraseFromParent();
                                         inst--;
+//                                    insertPtrCheckInBasicBlock(tmpF, bb, inst, SI, V);
 //                                    }
                                 }
                             }
@@ -823,6 +834,16 @@ namespace {
 #endif
                         }
                     }
+                    
+//                    if (StoreInst *SI = dyn_cast<StoreInst>(inst)) {
+//                        if (pointerLevel(SI->getPointerOperand()->getType()) >= 2) {
+//                            if (Value *V = getComeFromGEPAndChangeOrigin(SI->getValueOperand())) {
+//                                insertPtrCheckInBasicBlock(tmpF, bb, inst, SI, V);
+//                                tmpF->dump();
+//                            }
+//
+//                        }
+//                    }
                     
                     #ifdef DEBUG
                     inst->dump();
@@ -861,41 +882,120 @@ namespace {
             IntToPtrInst *ITPAnd = new IntToPtrInst(BOAnd, PointerType::getUnqual(address->getType()), "", &(*inst));
 
             LoadInst *multiLI = new LoadInst(ITPAnd, "", &(*inst));
-            PtrToIntInst *PTImulti = new PtrToIntInst(multiLI, Type::getInt64Ty(originBB->getContext()), "", &(*inst));
-            BinaryOperator *BOmulte = BinaryOperator::Create(Instruction::BinaryOps::And, PTImulti, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), AND_PTR_VALUE, false), "", &(*inst));
-            IntToPtrInst *ITPmulti = new IntToPtrInst(BOmulte, multiLI->getType(), "", &(*inst));
+//            PtrToIntInst *PTImulti = new PtrToIntInst(multiLI, Type::getInt64Ty(originBB->getContext()), "", &(*inst));
+//            BinaryOperator *BOmulte = BinaryOperator::Create(Instruction::BinaryOps::And, PTImulti, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), AND_PTR_VALUE, false), "", &(*inst));
+//            IntToPtrInst *ITPmulti = new IntToPtrInst(BOmulte, multiLI->getType(), "", &(*inst));
             
             originBB++;
             inst = originBB->begin();
             PHINode *PhiNode = PHINode::Create(address->getType(), 2, "", &(*inst));
             PhiNode->addIncoming(address, oldBB);
-            PhiNode->addIncoming(ITPmulti, nBAND);
+            PhiNode->addIncoming(multiLI, nBAND);
             return PhiNode;
+        }
+        
+        void insertPtrCheckInBasicBlock(Function* F, Function::iterator &originBB, BasicBlock::iterator &insetPoint, StoreInst *SI ,Value *nodeOrigin){
+            ICmpInst *ICM;
+            
+            if (nodeOrigin->getName().contains("sameLI")) {
+                Instruction *I = dyn_cast<Instruction>(nodeOrigin);
+                BasicBlock::iterator tmp = I->getParent()->begin();
+                while (&(*tmp) != I) {
+                    ++tmp;
+                }
+                ++tmp;
+                ++tmp;
+                ++tmp;
+                ICM = dyn_cast<ICmpInst>(&(*tmp));
+            } else {
+                LoadInst *address = new LoadInst(nodeOrigin, "Origin", &(*insetPoint));
+                PtrToIntInst *PTI = new PtrToIntInst(address, Type::getInt64Ty(originBB->getContext()), "", &(*insetPoint));
+                BinaryOperator *BO = BinaryOperator::Create(Instruction::BinaryOps::And, PTI, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), MULTIPTRHEAD, false), "", &(*insetPoint));
+                ICmpInst *ICM = new ICmpInst(&(*insetPoint), llvm::CmpInst::ICMP_EQ, BO, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), MULTIPTR, false));
+            }
+            
+            
+            BasicBlock *SIBB = llvm::SplitBlock(&(*originBB), &(*insetPoint), nullptr, nullptr);
+            ++insetPoint;
+            BasicBlock *newBB = llvm::SplitBlock(&(*SIBB), &(*insetPoint), nullptr, nullptr);
+            insetPoint = newBB->begin();
+            
+            BasicBlock *oldBB = &(*originBB);
+            BasicBlock::iterator inst = originBB->begin();
+            newBB->setName("newBasicBlock");
+            SIBB->setName("SIBasicBlock");
+            originBB->setName("oldBasicBlock");
+            
+            BasicBlock *nBGetPtr = BasicBlock::Create(originBB->getContext(), "getPtrBB", F, SIBB);
+            BranchInst *nBIGetPtr = BranchInst::Create(newBB, nBGetPtr);
+            
+//            BranchInst *nBISI = BranchInst::Create(newBB, SIBB);
+            
+            BranchInst *oldBR = BranchInst::Create(nBGetPtr, SIBB, ICM, &(*originBB));
+            inst = originBB->end();
+            inst--;
+            inst--;
+            inst->eraseFromParent();
+            
+            originBB++;
+            inst = originBB->begin();
+            
+            std::vector<Value *> getPtrArg;
+            
+            LoadInst *LI = dyn_cast<LoadInst>(nodeOrigin);
+            BitCastInst *originBCI = new BitCastInst(LI->getPointerOperand(), PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(F->getContext()))), "oriBCI", &(*inst));
+            getPtrArg.push_back(originBCI);
+            BitCastInst *oldBCI = new BitCastInst(SI->getPointerOperand(), PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(F->getContext()))), "oldBCI", &(*inst));
+            getPtrArg.push_back(oldBCI);
+            BitCastInst *ptrBCI = new BitCastInst(SI->getValueOperand(), PointerType::getUnqual(Type::getInt8Ty(F->getContext())), "ptrBCI", &(*inst));
+            getPtrArg.push_back(ptrBCI);
+            
+            ArrayRef<Value *> funcArg(getPtrArg);
+            Value *func = F->getParent()->getFunction("getPtr");
+            CallInst *nCI = CallInst::Create(func, funcArg, "", &(*inst));
+            
+            
+            originBB++;
+            originBB++;
+            inst = originBB->begin();
+//            BinaryOperator *BOAnd = BinaryOperator::Create(Instruction::BinaryOps::And, PTI, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), AND_PTR_VALUE, false), "", &(*inst));
+//            IntToPtrInst *ITPAnd = new IntToPtrInst(BOAnd, PointerType::getUnqual(address->getType()), "", &(*inst));
+//
+//            LoadInst *multiLI = new LoadInst(ITPAnd, "", &(*inst));
+//            PtrToIntInst *PTImulti = new PtrToIntInst(multiLI, Type::getInt64Ty(originBB->getContext()), "", &(*inst));
+//            BinaryOperator *BOmulte = BinaryOperator::Create(Instruction::BinaryOps::And, PTImulti, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), AND_PTR_VALUE, false), "", &(*inst));
+//            IntToPtrInst *ITPmulti = new IntToPtrInst(BOmulte, multiLI->getType(), "", &(*inst));
+            
+//            originBB++;
+//            inst = originBB->begin();
+//            PHINode *PhiNode = PHINode::Create(address->getType(), 2, "", &(*inst));
+//            PhiNode->addIncoming(address, oldBB);
+//            PhiNode->addIncoming(ITPmulti, nBAND);
         }
         
 //        Value * insertPtrCheckInBasicBlock(Function* F, Function::iterator &originBB, BasicBlock::iterator &insetPoint, Value *address){
 //            PtrToIntInst *PTI = new PtrToIntInst(address, Type::getInt64Ty(originBB->getContext()), "", &(*insetPoint));
 //            BinaryOperator *BO = BinaryOperator::Create(Instruction::BinaryOps::And, PTI, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), MULTIPTR_OR_NODEPTR, false), "", &(*insetPoint));
 //            ICmpInst *ICM = new ICmpInst(&(*insetPoint), llvm::CmpInst::ICMP_NE, BO, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), 0, false));
-//            
+//
 //            BasicBlock *newBB = llvm::SplitBlock(&(*originBB), &(*insetPoint), nullptr, nullptr);
 //            BasicBlock *oldBB = &(*originBB);
 //            BasicBlock::iterator inst = originBB->begin();
 //            newBB->setName("newBasicBlock");
 //            originBB->setName("oldBasicBlock");
-//            
-//            BasicBlock *nBAND = BasicBlock::Create(originBB->getContext(), "ANDBB", F, newBB);
+//
+//            BasicBlock *nBAND = BasicBlock::Create(originBB->getContext(), "getPtrBB", F, newBB);
 //            BranchInst *nBIAND = BranchInst::Create(newBB, nBAND);
-//            
-//            BasicBlock *nBmulti = BasicBlock::Create(originBB->getContext(), "multiBB", F, newBB);
+//
+//            BasicBlock *nBmulti = BasicBlock::Create(originBB->getContext(), "SIBB", F, newBB);
 //            BranchInst *nBINode = BranchInst::Create(newBB, nBmulti);
-//            
+//
 //            BranchInst *oldBR = BranchInst::Create(nBAND, newBB, ICM, &(*originBB));
 //            inst = originBB->end();
 //            inst--;
 //            inst--;
 //            inst->eraseFromParent();
-//            
+//
 //            originBB++;
 //            inst = originBB->begin();
 //            BinaryOperator *BOAnd = BinaryOperator::Create(Instruction::BinaryOps::And, PTI, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), AND_PTR_VALUE, false), "", &(*inst));
@@ -904,7 +1004,7 @@ namespace {
 //            ICmpInst *ICMelse = new ICmpInst(&(*inst), llvm::CmpInst::ICMP_NE, BOmul, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), 0, false));
 //            BranchInst *oldBRelse = BranchInst::Create(nBmulti, newBB, ICMelse, &(*originBB));
 //            inst->eraseFromParent();
-//            
+//
 //            originBB++;
 //            inst = originBB->begin();
 //            BitCastInst *multiBCI = new BitCastInst(ITPAnd, PointerType::getUnqual(ITPAnd->getType()), "", &(*inst));
@@ -912,7 +1012,7 @@ namespace {
 //            PtrToIntInst *PTImulti = new PtrToIntInst(multiLI, Type::getInt64Ty(originBB->getContext()), "", &(*inst));
 //            BinaryOperator *BOmulte = BinaryOperator::Create(Instruction::BinaryOps::And, PTImulti, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), AND_PTR_VALUE, false), "", &(*inst));
 //            IntToPtrInst *ITPmulti = new IntToPtrInst(BOmulte, multiLI->getType(), "", &(*inst));
-//            
+//
 //            originBB++;
 //            inst = originBB->begin();
 //            PHINode *PhiNode = PHINode::Create(address->getType(), 3, "", &(*inst));
