@@ -160,6 +160,14 @@ namespace {
             
             
             
+            Type *DPPtrCheckerCountGT = Type::getInt64Ty(M.getContext());
+            GlobalVariable *DPPtrCheckerCountGV = new GlobalVariable(M, DPPtrCheckerCountGT, false, Function::ExternalLinkage, nullptr, "DPPtrCheckerCount", nullptr, llvm::GlobalValue::ThreadLocalMode::NotThreadLocal, 0, false);
+            
+            Type *DPPtrProtectCountGT = Type::getInt64Ty(M.getContext());
+            GlobalVariable *DPPtrProtectCountGV = new GlobalVariable(M, DPPtrProtectCountGT, false, Function::ExternalLinkage, nullptr, "DPPtrProtectCount", nullptr, llvm::GlobalValue::ThreadLocalMode::NotThreadLocal, 0, false);
+            
+//            GlobalVariable(DPGT, 0, GlobalVariable::ExternalLinkage);
+            
             typeList.push_back(Type::getInt64Ty(M.getContext()));
 //            typeList.push_back(PointerType::getUnqual(PointerType::getUnqual(Type::getInt8Ty(M.getContext()))));
             ArrayRef<Type *> mallocListAR(typeList);

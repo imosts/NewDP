@@ -25,6 +25,7 @@
 
 //#define DEBUG
 #define NOTMACBASE
+#define COVERDEBUG
 
 using namespace llvm;
 
@@ -36,7 +37,8 @@ namespace {
         bool isIniGloVar = false;
         bool isFunHasNullPtr = false;
         AllocaInst *FunNullPtr = NULL;
-        GlobalVariable *GNPtr = NULL;
+        GlobalVariable *DPPtrCheckerCountPtr = NULL;
+        GlobalVariable *DPPtrProtectCountPtr = NULL;
         
         unsigned ini_type = 0;
         
@@ -70,6 +72,19 @@ namespace {
             errs() << "  Function:" << tmpF->getName() <<'\n' <<'\n';
             #endif
             
+#ifdef COVERDEBUG
+            for(auto iter = tmpF->getParent()->global_begin(); iter != tmpF->getParent()->global_end(); ++iter) {
+                if (GlobalVariable *GV = dyn_cast<GlobalVariable>(iter)) {
+                    if (GV->getName().equals("DPPtrCheckerCount")) {
+//                        errs() << "GNPtr init: " << DPPtrCheckerCountPtr << '\n';
+                        DPPtrCheckerCountPtr = GV;
+                    } else if (GV->getName().equals("DPPtrProtectCount")) {
+                        DPPtrProtectCountPtr = GV;
+                    }
+                }
+            }
+#endif
+            
             FunctionType *FT = F.getFunctionType();
             bool hasStructType = false;
             bool isAllStdType = true;
@@ -84,6 +99,8 @@ namespace {
                     }
                 }
             }
+            
+            
 //            if (hasStructType && isAllStdType) {
 //                return false;
 //            }
@@ -108,7 +125,12 @@ namespace {
                         errs() << "LoadInst Deubg1 :" << '\n';
                         #endif
                         
-                        if (pointerLevel(LI->getOperand(0)->getType()) >= 2 && !(LI->getOperand(0)->getType()->getContainedType(0)->isFunctionTy())) {
+//                        LI->dump();
+//                        errs() << pointerLevel(LI->getOperand(0)->getType()) << '\n';
+                        
+                        if (pointerLevel(LI->getOperand(0)->getType()) >= 2
+//                            && !(LI->getOperand(0)->getType()->getContainedType(0)->isFunctionTy())
+                            ) {
                             #ifdef DEBUG
 //                            bb->dump();
                             errs() << "LoadInst Deubg:" << '\n';
@@ -246,23 +268,23 @@ namespace {
 
                                             }
 #ifdef NOTMACBASE
-                                            else{
-                                                if (!(II->getFunctionType()->isVarArg())) {
-                                                    for (Instruction::op_iterator oi = II->op_begin(); oi != II->op_end(); ++oi) {
-                                                        if (Value *V = dyn_cast<Value>(oi)) {
-                                                            if (isComeFormLI(V, LI)) {
-#ifdef DEBUG
-                                                                errs() << "find Function Pointer LI use!" << '\n';
-#endif
-                                                                LIUseNum++;
-                                                                FunArgUseNum++;
-                                                                continue;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                            }
+//                                            else{
+//                                                if (!(II->getFunctionType()->isVarArg())) {
+//                                                    for (Instruction::op_iterator oi = II->op_begin(); oi != II->op_end(); ++oi) {
+//                                                        if (Value *V = dyn_cast<Value>(oi)) {
+//                                                            if (isComeFormLI(V, LI)) {
+//#ifdef DEBUG
+//                                                                errs() << "find Function Pointer LI use!" << '\n';
+//#endif
+//                                                                LIUseNum++;
+//                                                                FunArgUseNum++;
+//                                                                continue;
+//                                                            }
+//                                                        }
+//                                                    }
+//                                                }
+//
+//                                            }
 #endif
                                         }
 
@@ -381,7 +403,7 @@ namespace {
                                                                         LIUseNum--;
                                                                         FunArgUseNum--;
                                                                         if (BitCastInst *BCI = dyn_cast<BitCastInst>(CI->getOperand(i))) {
-                                                                            
+
                                                                             BitCastInst *nBCI = new BitCastInst(sameLI, BCI->getType(), "", CI);
                                                                             CI->setOperand(i, nBCI);
                                                                             if (BCI->getNumUses() == 0) {
@@ -400,7 +422,7 @@ namespace {
                                                                 }
                                                             }
                                                         }
-                                                        
+
                                                     }
                                                 }
 
@@ -464,37 +486,37 @@ namespace {
 
                                                 }
 #ifdef NOTMACBASE
-                                                else{
-                                                    if (!(II->getFunctionType()->isVarArg())) {
-                                                        for (unsigned i = 0; i < II->getNumOperands(); ++i) {
-                                                            if (Value *V = dyn_cast<Value>(II->llvm::User::getOperand(i))) {
-                                                                if (isComeFormSouce(V, phi)) {
-#ifdef DEBUG
-                                                                    errs() << "chang FunArg:" << '\n';
-                                                                    II->dump();
-#endif
-                                                                    LIUseNum--;
-                                                                    FunArgUseNum--;
-                                                                    if (BitCastInst *BCI = dyn_cast<BitCastInst>(II->getOperand(i))) {
-                                                                        BitCastInst *nBCI = new BitCastInst(sameLI, BCI->getType(), "", II);
-                                                                        II->setOperand(i, nBCI);
-                                                                        if (BCI->getNumUses() == 0) {
-                                                                            BCI->eraseFromParent();
-                                                                        }
-                                                                    } else if (PtrToIntInst *PTI = dyn_cast<PtrToIntInst>(II->getOperand(i))) {
-                                                                        PtrToIntInst *nPTI = new PtrToIntInst(sameLI, II->getOperand(i)->getType(), "", &(*II));
-                                                                        II->setOperand(i, nPTI);
-                                                                        if (PTI->getNumUses() == 0) {
-                                                                            PTI->eraseFromParent();
-                                                                        }
-                                                                    } else {
-                                                                        II->setOperand(i, sameLI);
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
+//                                                else{
+//                                                    if (!(II->getFunctionType()->isVarArg())) {
+//                                                        for (unsigned i = 0; i < II->getNumOperands(); ++i) {
+//                                                            if (Value *V = dyn_cast<Value>(II->llvm::User::getOperand(i))) {
+//                                                                if (isComeFormSouce(V, phi)) {
+//#ifdef DEBUG
+//                                                                    errs() << "chang FunArg:" << '\n';
+//                                                                    II->dump();
+//#endif
+//                                                                    LIUseNum--;
+//                                                                    FunArgUseNum--;
+//                                                                    if (BitCastInst *BCI = dyn_cast<BitCastInst>(II->getOperand(i))) {
+//                                                                        BitCastInst *nBCI = new BitCastInst(sameLI, BCI->getType(), "", II);
+//                                                                        II->setOperand(i, nBCI);
+//                                                                        if (BCI->getNumUses() == 0) {
+//                                                                            BCI->eraseFromParent();
+//                                                                        }
+//                                                                    } else if (PtrToIntInst *PTI = dyn_cast<PtrToIntInst>(II->getOperand(i))) {
+//                                                                        PtrToIntInst *nPTI = new PtrToIntInst(sameLI, II->getOperand(i)->getType(), "", &(*II));
+//                                                                        II->setOperand(i, nPTI);
+//                                                                        if (PTI->getNumUses() == 0) {
+//                                                                            PTI->eraseFromParent();
+//                                                                        }
+//                                                                    } else {
+//                                                                        II->setOperand(i, sameLI);
+//                                                                    }
+//                                                                }
+//                                                            }
+//                                                        }
+//                                                    }
+//                                                }
 #endif
                                             }
                                         }
@@ -845,6 +867,15 @@ namespace {
 //                        }
 //                    }
                     
+//                    if (ReturnInst *RT = dyn_cast<ReturnInst>(inst)) {
+////                        errs() << DPPtrCheckerCountPtr << '\n';
+//                        if (DPPtrCheckerCountPtr) {
+//                            LoadInst *LI = new LoadInst(DPPtrCheckerCountPtr, "", &(*inst));
+//                            BinaryOperator *BO = BinaryOperator::CreateNSW(Instruction::BinaryOps::Add, LI, ConstantInt::get(Type::getInt64Ty(tmpF->getContext()), 1, false), "", &(*inst));
+//                            StoreInst *SI = new StoreInst(BO, DPPtrCheckerCountPtr, &(*inst));
+//                        }
+//                    }
+                    
                     #ifdef DEBUG
                     inst->dump();
                     errs() << "  Inst After" <<'\n' <<'\n';
@@ -857,9 +888,18 @@ namespace {
         };
         
         Value * insertLoadCheckInBasicBlock(Function* F, Function::iterator &originBB, BasicBlock::iterator &insetPoint, Value *address){
+            
             PtrToIntInst *PTI = new PtrToIntInst(address, Type::getInt64Ty(originBB->getContext()), "", &(*insetPoint));
             BinaryOperator *BO = BinaryOperator::Create(Instruction::BinaryOps::And, PTI, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), MULTIPTRHEAD, false), "", &(*insetPoint));
             ICmpInst *ICM = new ICmpInst(&(*insetPoint), llvm::CmpInst::ICMP_EQ, BO, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), MULTIPTR, false));
+            
+#ifdef COVERDEBUG
+            if (DPPtrCheckerCountPtr) {
+                LoadInst *LI = new LoadInst(DPPtrCheckerCountPtr, "", &(*insetPoint));
+                BinaryOperator *BO = BinaryOperator::CreateNSW(Instruction::BinaryOps::Add, LI, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), 1, false), "", &(*insetPoint));
+                StoreInst *SI = new StoreInst(BO, DPPtrCheckerCountPtr, &(*insetPoint));
+            }
+#endif
             
             BasicBlock *newBB = llvm::SplitBlock(&(*originBB), &(*insetPoint), nullptr, nullptr);
             BasicBlock *oldBB = &(*originBB);
@@ -882,6 +922,14 @@ namespace {
             IntToPtrInst *ITPAnd = new IntToPtrInst(BOAnd, PointerType::getUnqual(address->getType()), "", &(*inst));
 
             LoadInst *multiLI = new LoadInst(ITPAnd, "", &(*inst));
+            
+#ifdef COVERDEBUG
+            if (DPPtrProtectCountPtr) {
+                LoadInst *LI = new LoadInst(DPPtrProtectCountPtr, "", &(*inst));
+                BinaryOperator *BO = BinaryOperator::CreateNSW(Instruction::BinaryOps::Add, LI, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), 1, false), "", &(*inst));
+                StoreInst *SI = new StoreInst(BO, DPPtrProtectCountPtr, &(*inst));
+            }
+#endif
 //            PtrToIntInst *PTImulti = new PtrToIntInst(multiLI, Type::getInt64Ty(originBB->getContext()), "", &(*inst));
 //            BinaryOperator *BOmulte = BinaryOperator::Create(Instruction::BinaryOps::And, PTImulti, ConstantInt::get(Type::getInt64Ty(originBB->getContext()), AND_PTR_VALUE, false), "", &(*inst));
 //            IntToPtrInst *ITPmulti = new IntToPtrInst(BOmulte, multiLI->getType(), "", &(*inst));
